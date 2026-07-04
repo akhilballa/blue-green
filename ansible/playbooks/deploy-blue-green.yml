@@ -1,0 +1,8 @@
+---
+- name: Deploy candidate color through blue-green switchover
+  hosts: local
+  gather_facts: false
+  vars:
+    blue_green_candidate_color: "{{ target_color | default('green') }}"
+  roles:
+    - role: blue_green_switcher

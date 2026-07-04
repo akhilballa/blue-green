@@ -1,0 +1,24 @@
+---
+- name: Start candidate service containers
+  ansible.builtin.command: "{{ blue_green_compose_command }} up -d {{ target_color }}-{{ item }}"
+  args:
+    chdir: "{{ blue_green_project_root }}"
+  register: service_start
+  changed_when: >-
+    'Started' in service_start.stdout
+    or 'Created' in service_start.stdout
+    or 'Recreated' in service_start.stdout
+  loop: "{{ blue_green_service_names }}"
+
+- name: Wait for candidate service health endpoints
+  ansible.builtin.command: >-
+    {{ blue_green_compose_command }} exec -T {{ target_color }}-{{ item }}
+    python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ blue_green_service_port }}{{ blue_green_health_path }}', timeout=2).read()"
+  args:
+    chdir: "{{ blue_green_project_root }}"
+  register: health_probe
+  changed_when: false
+  retries: "{{ blue_green_health_retries }}"
+  delay: "{{ blue_green_health_delay }}"
+  until: health_probe.rc == 0
+  loop: "{{ blue_green_service_names }}"

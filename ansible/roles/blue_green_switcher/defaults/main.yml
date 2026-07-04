@@ -1,0 +1,27 @@
+---
+blue_green_project_root: "{{ playbook_dir }}/../.."
+blue_green_current_color_file: "{{ blue_green_project_root }}/.runtime/active_color"
+blue_green_default_color: "blue"
+blue_green_candidate_color: "green"
+blue_green_allowed_colors:
+  - blue
+  - green
+
+blue_green_service_names:
+  - catalog
+  - cart
+  - checkout
+  - payment
+  - user
+
+blue_green_service_port: 8080
+blue_green_health_path: "/health"
+blue_green_health_retries: 20
+blue_green_health_delay: 2
+blue_green_expected_status: 200
+
+blue_green_nginx_conf_path: "{{ blue_green_project_root }}/nginx/conf.d/active-upstreams.conf"
+blue_green_compose_command: "docker compose"
+blue_green_nginx_test_command: "docker compose exec -T nginx nginx -t"
+blue_green_reload_command: "docker compose exec -T nginx nginx -s reload"
+blue_green_public_url: "http://localhost:8080"

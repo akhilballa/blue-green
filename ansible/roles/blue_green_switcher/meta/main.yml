@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: blue_green_switcher
+  author: project
+  description: Health-gated blue-green switchover for Docker Compose services behind Nginx.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+dependencies: []

@@ -1,0 +1,8 @@
+---
+- name: Roll back traffic to a known healthy color
+  hosts: local
+  gather_facts: false
+  vars:
+    blue_green_candidate_color: "{{ rollback_color | default('blue') }}"
+  roles:
+    - role: blue_green_switcher

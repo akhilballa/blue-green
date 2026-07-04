@@ -1,0 +1,161 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: blue-green-nginx
+    depends_on:
+      blue-catalog:
+        condition: service_healthy
+      blue-cart:
+        condition: service_healthy
+      blue-checkout:
+        condition: service_healthy
+      blue-payment:
+        condition: service_healthy
+      blue-user:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  blue-catalog:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: catalog
+      SERVICE_COLOR: blue
+      SERVICE_VERSION: "1.0.0"
+      DOWNSTREAMS: "http://blue-user:8080/health,http://blue-cart:8080/health"
+    networks:
+      - app_net
+    healthcheck: &service-healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  blue-cart:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: cart
+      SERVICE_COLOR: blue
+      SERVICE_VERSION: "1.0.0"
+      DOWNSTREAMS: "http://blue-user:8080/health"
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  blue-checkout:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: checkout
+      SERVICE_COLOR: blue
+      SERVICE_VERSION: "1.0.0"
+      DOWNSTREAMS: "http://blue-cart:8080/health,http://blue-payment:8080/health"
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  blue-payment:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: payment
+      SERVICE_COLOR: blue
+      SERVICE_VERSION: "1.0.0"
+      DOWNSTREAMS: ""
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  blue-user:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: user
+      SERVICE_COLOR: blue
+      SERVICE_VERSION: "1.0.0"
+      DOWNSTREAMS: ""
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  green-catalog:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: catalog
+      SERVICE_COLOR: green
+      SERVICE_VERSION: "1.1.0"
+      DOWNSTREAMS: "http://green-user:8080/health,http://green-cart:8080/health"
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  green-cart:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: cart
+      SERVICE_COLOR: green
+      SERVICE_VERSION: "1.1.0"
+      DOWNSTREAMS: "http://green-user:8080/health"
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  green-checkout:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: checkout
+      SERVICE_COLOR: green
+      SERVICE_VERSION: "1.1.0"
+      DOWNSTREAMS: "http://green-cart:8080/health,http://green-payment:8080/health"
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  green-payment:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: payment
+      SERVICE_COLOR: green
+      SERVICE_VERSION: "1.1.0"
+      DOWNSTREAMS: ""
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+  green-user:
+    build:
+      context: ./app
+    environment:
+      SERVICE_NAME: user
+      SERVICE_COLOR: green
+      SERVICE_VERSION: "1.1.0"
+      DOWNSTREAMS: ""
+    networks:
+      - app_net
+    healthcheck: *service-healthcheck
+    restart: unless-stopped
+
+networks:
+  app_net:
+    driver: bridge

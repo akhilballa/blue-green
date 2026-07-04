@@ -1,0 +1,6 @@
+---
+- name: reload nginx
+  ansible.builtin.command: "{{ blue_green_reload_command }}"
+  args:
+    chdir: "{{ blue_green_project_root }}"
+  changed_when: true

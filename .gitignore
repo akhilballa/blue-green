@@ -1,0 +1,8 @@
+.runtime/
+results/*.txt
+results/*.log
+results/*.json
+__pycache__/
+*.pyc
+.DS_Store
+.env

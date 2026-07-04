@@ -1,0 +1,25 @@
+---
+- name: Verify public application routes through Nginx
+  hosts: local
+  gather_facts: false
+  vars:
+    blue_green_public_url: "http://localhost:8080"
+    blue_green_service_names:
+      - catalog
+      - cart
+      - checkout
+      - payment
+      - user
+  tasks:
+    - name: Verify gateway health
+      ansible.builtin.uri:
+        url: "{{ blue_green_public_url }}/health"
+        status_code: 200
+        return_content: true
+
+    - name: Verify service health routes
+      ansible.builtin.uri:
+        url: "{{ blue_green_public_url }}/api/{{ item }}/health"
+        status_code: 200
+        return_content: true
+      loop: "{{ blue_green_service_names }}"

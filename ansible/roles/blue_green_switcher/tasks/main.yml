@@ -1,0 +1,124 @@
+---
+- name: Normalize requested color
+  ansible.builtin.set_fact:
+    blue_green_target_color: "{{ blue_green_candidate_color | lower | trim }}"
+
+- name: Validate requested color
+  ansible.builtin.assert:
+    that:
+      - blue_green_target_color in blue_green_allowed_colors
+    fail_msg: "target color must be one of {{ blue_green_allowed_colors | join(', ') }}"
+
+- name: Ensure runtime directory exists
+  ansible.builtin.file:
+    path: "{{ blue_green_current_color_file | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Check active color state file
+  ansible.builtin.stat:
+    path: "{{ blue_green_current_color_file }}"
+  register: active_color_state
+
+- name: Read active color state file
+  ansible.builtin.slurp:
+    path: "{{ blue_green_current_color_file }}"
+  register: active_color_content
+  when: active_color_state.stat.exists
+
+- name: Set previous active color
+  ansible.builtin.set_fact:
+    blue_green_previous_color: >-
+      {{
+        (active_color_content.content | b64decode | trim)
+        if active_color_state.stat.exists
+        else blue_green_default_color
+      }}
+
+- name: Health-check candidate color before switch
+  ansible.builtin.include_tasks: health_check.yml
+  vars:
+    target_color: "{{ blue_green_target_color }}"
+
+- name: Switch traffic with automatic rollback
+  block:
+    - name: Render Nginx upstreams for candidate color
+      ansible.builtin.template:
+        src: active-upstreams.conf.j2
+        dest: "{{ blue_green_nginx_conf_path }}"
+        mode: "0644"
+        unsafe_writes: true
+      vars:
+        active_color: "{{ blue_green_target_color }}"
+      register: upstream_template
+
+    - name: Wait for Nginx to accept candidate config
+      ansible.builtin.command: "{{ blue_green_nginx_test_command }}"
+      args:
+        chdir: "{{ blue_green_project_root }}"
+      register: nginx_candidate_config_test
+      changed_when: false
+      retries: "{{ blue_green_health_retries }}"
+      delay: 1
+      until: nginx_candidate_config_test.rc == 0
+      when: upstream_template.changed
+
+    - name: Reload Nginx after upstream change
+      ansible.builtin.command: "{{ blue_green_reload_command }}"
+      args:
+        chdir: "{{ blue_green_project_root }}"
+      changed_when: true
+      when: upstream_template.changed
+
+    - name: Verify public routes after switch
+      ansible.builtin.uri:
+        url: "{{ blue_green_public_url }}/api/{{ item }}/health"
+        status_code: "{{ blue_green_expected_status }}"
+        return_content: true
+      register: public_probe
+      retries: "{{ blue_green_health_retries }}"
+      delay: "{{ blue_green_health_delay }}"
+      until: public_probe.status == blue_green_expected_status
+      loop: "{{ blue_green_service_names }}"
+
+    - name: Persist active color
+      ansible.builtin.copy:
+        dest: "{{ blue_green_current_color_file }}"
+        content: "{{ blue_green_target_color }}\n"
+        mode: "0644"
+
+  rescue:
+    - name: Restore previous Nginx upstreams
+      ansible.builtin.template:
+        src: active-upstreams.conf.j2
+        dest: "{{ blue_green_nginx_conf_path }}"
+        mode: "0644"
+        unsafe_writes: true
+      vars:
+        active_color: "{{ blue_green_previous_color }}"
+
+    - name: Wait for Nginx to accept rollback config
+      ansible.builtin.command: "{{ blue_green_nginx_test_command }}"
+      args:
+        chdir: "{{ blue_green_project_root }}"
+      register: nginx_rollback_config_test
+      changed_when: false
+      retries: "{{ blue_green_health_retries }}"
+      delay: 1
+      until: nginx_rollback_config_test.rc == 0
+
+    - name: Reload Nginx after rollback
+      ansible.builtin.command: "{{ blue_green_reload_command }}"
+      args:
+        chdir: "{{ blue_green_project_root }}"
+      changed_when: true
+
+    - name: Persist restored active color
+      ansible.builtin.copy:
+        dest: "{{ blue_green_current_color_file }}"
+        content: "{{ blue_green_previous_color }}\n"
+        mode: "0644"
+
+    - name: Fail deployment after rollback
+      ansible.builtin.fail:
+        msg: "Deployment to {{ blue_green_target_color }} failed. Traffic was rolled back to {{ blue_green_previous_color }}."
