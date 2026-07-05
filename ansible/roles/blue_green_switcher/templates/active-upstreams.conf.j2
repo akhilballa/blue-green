@@ -2,7 +2,7 @@
 
 {% for service_name in blue_green_service_names %}
 upstream {{ service_name }}_backend {
-    server {{ active_color }}-{{ service_name }}:{{ blue_green_service_port }} max_fails=1 fail_timeout=1s;
+    server {{ active_color }}-{{ service_name }}:{{ blue_green_service_port }} max_fails=3 fail_timeout=2s;
     keepalive 32;
 }
 
