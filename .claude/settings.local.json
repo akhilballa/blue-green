@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(command -v docker)",
-      "Bash(echo \"docker: $\\(command -v docker || echo MISSING\\)\")",
-      "Bash(docker --version)"
-    ]
-  }
-}
